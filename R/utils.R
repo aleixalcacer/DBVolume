@@ -57,3 +57,30 @@ volume_AB <- function(points, chA, chB, chI, mA, mB, mAB, sd = 0.1) {
     }
     v / n
 }
+
+volume_square <- function(ch, points, sigma = 1) {
+    n <- nrow(points)
+    v <- c()
+    sigma <- sigma / 2
+    
+    # Extract the points that determine the convex hull
+    points_hull <- ch$p[ch$hull, ]
+
+    for (i in 1:n) {
+        points_i <- matrix(0, nrow = 8, ncol = 3)
+
+        points_i[1, ] <- points[i, ] + c(-sigma, -sigma, -sigma)
+        points_i[2, ] <- points[i, ] + c(-sigma, -sigma, sigma)
+        points_i[3, ] <- points[i, ] + c(-sigma, sigma, -sigma)
+        points_i[4, ] <- points[i, ] + c(-sigma, sigma, sigma)
+        points_i[5, ] <- points[i, ] + c(sigma, -sigma, -sigma)
+        points_i[6, ] <- points[i, ] + c(sigma, -sigma, sigma)
+        points_i[7, ] <- points[i, ] + c(sigma, sigma, -sigma)
+        points_i[8, ] <- points[i, ] + c(sigma, sigma, sigma)
+
+        convhull <- geometry::intersectn(points_hull, points_i)
+        vol <- convhull$ch$vol
+        v <- c(v, vol)
+    }
+    v / n
+}
