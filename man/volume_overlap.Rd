@@ -4,18 +4,18 @@
 \alias{volume_overlap}
 \title{Volume overlap estimation for two sets of points}
 \usage{
-volume_overlap(pointsA, pointsB, sigma = 1, n = 10000, n_reps = 5)
+volume_overlap(points_a, points_b, sigma = NULL, n_sigma = 5)
 }
 \arguments{
-\item{pointsA}{A matrix of points}
+\item{points_a}{A matrix of points}
 
-\item{pointsB}{A matrix of points}
+\item{points_b}{A matrix of points}
 
-\item{sigma}{The standard deviation of the Gaussian kernel}
+\item{sigma}{The standard deviation of the Gaussian kernel. If NULL, the
+volume overlap is estimated for a range of sigmas.}
 
-\item{n}{The number of samples to use}
-
-\item{n_reps}{The number of repetitions to use}
+\item{n_sigma}{The number of sigmas to use for estimating the volume overlap.
+Only used if sigma is NULL.}
 }
 \value{
 A data frame with the volume overlap estimation

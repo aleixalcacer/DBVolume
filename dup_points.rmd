@@ -1,0 +1,212 @@
+# Introduction
+
+```{r}
+
+library(tidyverse)
+
+# Generate a random set of 3D points with mean 1 and standard deviation 3
+# points_01 <- tibble(x = rnorm(100, 0, 3), y = rnorm(100, 0, 3), z = rnorm(100, 0, 3))
+
+n <- 20
+points_01 <- tibble(x = runif(n, 0, 1), y = runif(n, 0, 1), z = runif(n, 0, 1))
+
+# Drop na
+points_01 <- points_01 %>% drop_na() %>% select("x", "y", "z")
+
+# points_02 <- tibble(x = rnorm(100, 1, 3), y = rnorm(100, 1, 3), z = rnorm(100, 1, 3))
+
+points_02 <- tibble(x = runif(n, 0, 1), y = runif(n, 0, 1), z = runif(n, 0.2, 1.2))
+
+# Drop na
+points_02 <- points_02 %>% drop_na() %>% select("x", "y", "z")
+
+```
+
+```{r}
+source("R/utils.R")
+source("R/voloverlap.R")
+
+# compute points in intersection
+
+convhull <- geometry::intersectn(points_01, points_02)
+ch_a <- convhull$ch1
+ch_b <- convhull$ch2
+ch_i <- convhull$ch
+points_u <- rbind(points_01, points_02)
+points_hull <- ch_i$p[ch_i$hull, ]
+
+points_01_h <- points_01 %>% mutate(in_i = geometry::inhulln(ch_i, as.matrix(points_01)))
+
+in_ch <- c()
+for (i in seq_len(nrow(points_01))) {
+  in_ch <- c(in_ch, all(points_01[i, ] %in% points_hull))
+}
+points_01_h <- points_01_h %>% mutate(in_ch = in_ch)
+points_01_h <- points_01_h %>% mutate(in_i = in_i & !in_ch)
+
+
+points_02_h <- points_02 %>% mutate(in_i = geometry::inhulln(ch_i, as.matrix(points_02)))
+in_ch <- c()
+for (i in seq_len(nrow(points_02))) {
+  in_ch <- c(in_ch, all(points_02[i, ] %in% points_hull))
+}
+points_02_h <- points_02_h %>% mutate(in_ch = in_ch)
+points_02_h <- points_02_h %>% mutate(in_i = in_i & !in_ch)
+
+```
+
+
+```{r}
+
+points_01_i <- points_01_h %>% filter(!in_i)
+points_01_i <- rbind(points_01_i, points_01_h %>% filter(in_i) %>% sample_frac(1))
+
+points_02_i <- points_02_h %>% filter(!in_i)
+points_02_i <- rbind(points_02_i, points_02_h %>% filter(in_i) %>% sample_frac(1))
+```
+
+```{r}
+
+library(plotly)
+
+# rotate plotly to set a oblique prespective
+
+scene = list(camera = list(eye = list(x = 1.5, y = 1.5, z = 0.1)))
+
+p <- plot_ly()
+p <- p %>% add_trace(type="scatter3d", data=as.tibble(points_01_i), x=~x, y=~y, z=~z, mode="markers", marker=list(size=2, color="green"))
+p <- p %>% add_trace(type="scatter3d", data=as.tibble(points_02_i), x=~x, y=~y, z=~z, mode="markers", marker=list(size=2, color="red"))
+p <- p %>% add_trace(type="mesh3d", data=as_tibble(points_01_i), x=~x, y=~y, z=~z, opacity=0.1, alphahull=0)
+p <- p %>% add_trace(type="mesh3d", data=as_tibble(points_02_i), x=~x, y=~y, z=~z, opacity=0.1, alphahull=0)
+p <- p %>% hide_guides()
+p <- p %>% layout(scene = scene)
+
+# save plot as png
+# orca(p, file = "s_10.png")
+
+p
+```
+
+
+```{r}
+source("R/utils.R")
+source("R/voloverlap.R")
+
+duplicated_points <- c(FALSE, TRUE)
+
+volumes <- NULL
+
+for(s_i in duplicated_points) {
+  print(s_i)
+  points_01_i <- points_01_h %>% filter(!in_i)
+  points_02_i <- points_02_h %>% filter(!in_i)
+
+  if (s_i) {
+    for (i in seq_len(4)) {
+        points_01_i <- rbind(points_01_i, points_01_h %>% filter(in_i))
+        points_02_i <- rbind(points_02_i, points_02_h %>% filter(in_i))
+    }
+  }
+  points_01_i <- points_01_i %>% select("x", "y", "z")
+  points_02_i <- points_02_i %>% select("x", "y", "z")
+
+  if (s_i) {
+    for (i in seq_len(4)) {
+      points_01_i <- bind_rows(points_01_i, points_01_i)
+      points_02_i <- bind_rows(points_02_i, points_02_i)
+    }
+  }
+  p1_i <- points_01_i %>% sample_frac(1)
+  p2_i <- points_02_i %>% sample_frac(1)
+
+  volume_density <- volume_overlap(p1_i, p2_i, n_sigma = 10, sigma = NULL)
+
+  params <- volume_density$sigma
+  volume_alpha_auto = pavo::voloverlap(p1_i, p2_i, type = "alpha", nsamp = 1e4)$pboth
+
+  for (i in seq_len(length(params))) {
+    volumes_i <- tibble(sampling = s_i, param = params[i], volume = volume_density$vboth, type = "density auto")
+    volumes <- rbind(volumes, volumes_i)
+
+    volumes_i <- tibble(sampling = s_i, param = params[i], volume = volume_density$vboth_extended[i], type = "density")
+    volumes <- rbind(volumes, volumes_i)
+  }
+
+  for(param in params) {
+    volumes_i <- tibble(sampling = s_i, param = param, volume = volume_alpha_auto, type = "alpha-shape auto")
+    volumes <- rbind(volumes, volumes_i)
+
+    volume_alpha <- pavo::voloverlap(p1_i, p2_i, type = "alpha", avalue = param, nsamp = 1e4)$pboth
+    volume_convex <- pavo::voloverlap(p1_i, p2_i, type = "convex")$vboth
+
+    volumes_i <- tibble(sampling = s_i, param = param, volume = volume_alpha, type = "alpha-shape")
+    volumes <- rbind(volumes, volumes_i)
+
+    volumes_i <- tibble(sampling = s_i, param = param, volume = volume_convex, type = "convex-hull")
+    volumes <- rbind(volumes, volumes_i)
+  }
+}
+```
+
+```{r}
+library(ggplot2)
+
+volumes_plot <- volumes
+p <- ggplot(volumes_plot, aes(x = param, y = volume, color = type)) +
+  facet_grid(sampling ~ .) +
+  geom_point() +
+  geom_line() +
+  scale_x_log10() +
+  coord_cartesian(ylim = c(0, .75)) +
+  labs(x = "Sigma/Alpha", y = "Volume", color = "Method")
+
+p
+
+```
+
+```{r}
+ggsave("s-volumes.png", p, width = 10, height = 6)
+```
+
+
+# Create table with auto values
+
+```{r}
+
+for(s_i in sampling) {
+  print(s_i)
+  points_01_i <- points_01_h %>% filter(!in_i)
+  points_01_i <- rbind(points_01_i, points_01_h %>% filter(in_i) %>% sample_frac(s_i))
+
+  points_02_i <- points_02_h %>% filter(!in_i)
+  points_02_i <- rbind(points_02_i, points_02_h %>% filter(in_i) %>% sample_frac(s_i))
+
+  points_01_i <- points_01_i %>% select("x", "y", "z")
+  points_02_i <- points_02_i %>% select("x", "y", "z")
+
+  p1_i <- points_01_i %>% sample_frac(1)
+  p2_i <- points_02_i %>% sample_frac(1)
+
+
+  v_overlap <- volume_overlap(p1_i, p2_i, n_sigma = 10)
+  volume_density <- v_overlap$vboth
+  sd_density <- v_overlap$vboth_sd
+  volume_alpha <- pavo::voloverlap(p1_i, p2_i, type = "alpha", nsamp = 1e4)$pboth
+  volume_convex <- pavo::voloverlap(p1_i, p2_i, type = "convex")$vboth
+
+  t <- knitr::kable(tibble(
+    volume_density = volume_density,
+    sd_density = sd_density,
+    cv_density = sd_density / volume_density,
+    volume_alpha = volume_alpha,
+    volume_convex = volume_convex,
+    density_convex = volume_density / volume_convex,
+  ), format = "latex")
+
+  print(t)
+}
+
+```
+
+
+

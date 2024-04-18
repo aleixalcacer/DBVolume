@@ -1,61 +1,60 @@
 #'
 #' @title Volume overlap estimation for two sets of points
 #' @description Estimate the volume overlap between two sets of points
-#' @param pointsA A matrix of points
-#' @param pointsB A matrix of points
-#' @param sigma The standard deviation of the Gaussian kernel
+#' @param points_a A matrix of points
+#' @param points_b A matrix of points
+#' @param sigma The standard deviation of the Gaussian kernel. If NULL, the
+#'  volume overlap is estimated for a range of sigmas.
+#' @param n_sigma The number of sigmas to use for estimating the volume overlap.
+#' Only used if sigma is NULL.
 #'
 #' @return A data frame with the volume overlap estimation
 #'
 #' @importFrom rlang :=
 #' @importFrom dplyr %>%
-#' 
+#'
 #' @export
-volume_overlap <- function(pointsA, pointsB, sigma = 1) {
-    convhull <- geometry::intersectn(pointsA, pointsB)
-    chA <- convhull$ch1
-    chB <- convhull$ch2
-    chI <- convhull$ch
+volume_overlap <- function(points_a, points_b, sigma = NULL, n_sigma = 5) {
+    convhull <- geometry::intersectn(points_a, points_b)
+    ch_a <- convhull$ch1
+    ch_b <- convhull$ch2
+    ch_i <- convhull$ch
+    points_u <- rbind(points_a, points_b)
 
-    pointsU <- rbind(pointsA, pointsB)
+    if (is.null(sigma)) {
+        sigma_max <- (max(points_u) - min(points_u)) * 2
+        sigma_min <- 1e-4
+        sigmas <- calculate_sigmas(sigma_min, sigma_max, n = n_sigma)
+    } else if (is.numeric(sigma)) {
+      sigmas <- c(sigma)
+    } else if (is.vector(sigma)) {
+      sigmas <- sigma
+    } else {
+      stop("sigma must be a numeric or a vector")
+    }
 
-    vI <- volume_square(chI, pointsU, sigma = sigma)
-    vA <- volume_square(chA, pointsU, sigma = sigma)
-    vB <- volume_square(chB, pointsU, sigma = sigma)
+    vboth <- c()
+    for (sigma in sigmas) {
+        v_i_i <- sum(volume_square(ch_i, points_u, sigma = sigma))
+        v_a_i <- sum(volume_square(ch_a, points_u, sigma = sigma))
+        v_b_i <- sum(volume_square(ch_b, points_u, sigma = sigma))
+        v_u_i <- v_a_i + v_b_i - v_i_i
+        vboth_i <- v_i_i / v_u_i
+        # vsmallest_i <- v_i_i / min(v_a_i, v_b_i)
 
-    vU <- vA + vB - vI
+        vboth <- c(vboth, vboth_i)
+    }
 
-    vboth <- vI / vU
-    vsmallest <- vI / min(vA, vB)
+    vboth_sd <- sd(vboth)
+    vboth_mean <- mean(vboth)
 
-}
-
-
-volume_overlap_normal <- function(pointsA, pointsB, sigma = 1, n = 1e4, n_reps = 5) {
-    sd = sigma
-    convhull <- geometry::intersectn(pointsA, pointsB)
-    chA <- convhull$ch1
-    chB <- convhull$ch2
-    chI <- convhull$ch
-
-    pointsU <- rbind(pointsA, pointsB)
-
-    samples <- get_samples(pointsU, n)
-
-    vI <- volume(samples, chI, means = pointsU, sd = sd)
-    vU <- volume_AB(samples, chA, chB, chI, pointsA, pointsB, pointsU, sd = sd)
-
-    # Params
-
-    # Vsmall <- vI / min(v1, v2)
-
-    Vboth <- sum(vI) / sum(vU)
-
-    info <- data.frame(
-        volCONVEX = pavo::voloverlap(pointsA, pointsB, type = "convex")$vboth,
-        volALPHA = pavo::voloverlap(pointsA, pointsB, type = "alpha")$pboth,
-        volDENSITY = Vboth
+    df <- list(
+        vboth = vboth_mean,
+        vboth_sd = vboth_sd,
+        vboth_cv = vboth_sd / vboth_mean,
+        vboth_extended = vboth,
+        sigmas = sigmas
     )
 
-    return(info)
+    return(df)
 }
