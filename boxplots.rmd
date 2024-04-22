@@ -7,7 +7,7 @@ library(tidyverse)
 # Generate a random set of 3D points with mean 1 and standard deviation 3
 # points_01 <- tibble(x = rnorm(100, 0, 3), y = rnorm(100, 0, 3), z = rnorm(100, 0, 3))
 
-n <- 400
+n <- 200
 points_01 <- tibble(x = runif(n, 0, 1), y = runif(n, 0, 1), z = runif(n, 0, 1))
 
 # Drop na
@@ -65,34 +65,19 @@ points_02_i <- points_02_h %>% filter(!in_i)
 points_02_i <- rbind(points_02_i, points_02_h %>% filter(in_i) %>% sample_frac(1))
 ```
 
+
 ```{r}
 
-library(plotly)
+points_u = rbind(points_01, points_02)
 
-# rotate plotly to set a oblique prespective
+# Compute the PCA
+pca <- prcomp(points_u)
 
-scene = list(camera = list(eye = list(x = 1.5, y = 1.5, z = 0.1)))
-
-p <- plot_ly()
-p <- p %>% add_trace(type="scatter3d", data=as.tibble(points_01_i), x=~x, y=~y, z=~z, mode="markers", marker=list(size=2, color="green"))
-p <- p %>% add_trace(type="scatter3d", data=as.tibble(points_02_i), x=~x, y=~y, z=~z, mode="markers", marker=list(size=2, color="red"))
-p <- p %>% add_trace(type="mesh3d", data=as_tibble(points_01_i), x=~x, y=~y, z=~z, opacity=0.1, alphahull=0)
-p <- p %>% add_trace(type="mesh3d", data=as_tibble(points_02_i), x=~x, y=~y, z=~z, opacity=0.1, alphahull=0)
-p <- p %>% hide_guides()
-p <- p %>% layout(scene = scene)
-
-# save plot as png
-orca(p, file = "s_10.png")
-
-p
+plot_points(points_01, points_02, pca=pca)
 ```
 
 ```{r}
 ```
-
-```{r}
-```
-
 
 
 ```{r}
@@ -117,6 +102,9 @@ for(s_i in sampling) {
   p1_i <- points_01_i %>% sample_frac(1)
   p2_i <- points_02_i %>% sample_frac(1)
 
+  p <- plot_points(p1_i, p2_i, pca=pca)
+  ggsave(paste0("figures/", "s-", s_i, ".png"), p, width = 5, height = 7)
+  
   volume_density <- volume_overlap(p1_i, p2_i, n_sigma = 10, sigma = NULL)
 
   params <- volume_density$sigma
@@ -163,7 +151,7 @@ p
 ```
 
 ```{r}
-ggsave("s-volumes.png", p, width = 10, height = 6)
+ggsave("figures/s-volume.png", p, width = 10, height = 6)
 ```
 
 

@@ -1,12 +1,30 @@
+
+```{r}
+# Set working directory
+setwd("C:/Users/aalcacer/Projects/DBVolume")
+```
+
+
 ```{r}
 # Load points 01
 
 # Load csv file from Downloads in macOS
 library(tidyverse)
-root <- "~/Downloads/coordenades_exemples/"
-# data <- read_csv2(paste0(root, "TCSArcalis.csv"))
-# data <- read_csv2(paste0(root, "TCSTlepidus_m.csv"))
-data <- read_csv2(paste0(root, "TCSTPionicus.csv"))
+root <- "data/"
+
+# example = "olot"
+# example = "lepidus"
+example = "pionicus"
+```
+
+```{r}
+if (example == "olot") {
+  data <- read_csv2(paste0(root, "TCSOlot.csv"))
+} else if (example == "lepidus") {
+  data <- read_csv2(paste0(root, "TCSTlepidus_m.csv"))
+} else if (example == "pionicus") {
+  data <- read_csv2(paste0(root, "TCSTPionicus.csv"))
+}
 
 points_01 <- data %>% select(x, y, z)
 
@@ -16,20 +34,20 @@ colnames(points_01) <- c("x", "y", "z")
 ```{r}
 # Load points 02
 
-# data <- read_csv2(paste0(root, "TCSOlot.csv"))
-# data <- read_csv2(paste0(root, "TCSTlepidus_f.csv"))
-data <- read_csv2(paste0(root, "TCSTPpeloponnesiacus.csv"))
+if (example == "olot") {
+  data <- read_csv2(paste0(root, "TCSArcalis.csv"))
+} else if (example == "lepidus") {
+  data <- read_csv2(paste0(root, "TCSTlepidus_f.csv"))
+} else if (example == "pionicus") {
+  data <- read_csv2(paste0(root, "TCSTPpeloponnesiacus.csv"))
+}
+
 
 points_02 <- data %>% select(x, y, z)
   
 colnames(points_02) <- c("x", "y", "z")
 ```
 
-
-```{r}
-# Set working directory
-setwd("~/Projects/DBVolume")
-```
 
 ```{r}
 source("R/voloverlap.R")
@@ -98,24 +116,48 @@ p <- ggplot(volumes_plot, aes(x = param, y = volume, color = method)) +
   scale_x_log10() +
   labs(x = "Sigma/Alpha", y = "Volume", color = "Method")
 
-p
 
-# ggsave("lepidus_lines.png", p, width = 10, height = 4)
-ggsave("pionicus_lines.png", p, width = 10, height = 4)
+ggsave(paste0("figures/", example, "_volume.png"), p, width = 10, height = 4)
 ```
 
 ```{r}
-library(plotly)
-
-p <- plot_ly()
-p <- p %>% add_trace(type="scatter3d", data=as.tibble(points_01), x=~x, y=~y, z=~z, mode="markers", marker=list(size=2, color="green"))
-p <- p %>% add_trace(type="scatter3d", data=as.tibble(points_02), x=~x, y=~y, z=~z, mode="markers", marker=list(size=2, color="red"))
-p <- p %>% add_trace(type="mesh3d", data=as_tibble(points_01), x=~x, y=~y, z=~z, opacity=0.1, alphahull=0)
-p <- p %>% add_trace(type="mesh3d", data=as_tibble(points_02), x=~x, y=~y, z=~z, opacity=0.1, alphahull=0)
-p <- p %>% hide_guides()
-
-p
 ```
+
+```{r}
+# Apply PCA to the points
+
+points_u = rbind(points_01, points_02)
+
+# Compute the PCA
+
+pca <- prcomp(points_u)
+
+# Plot the PCA in 2D
+
+pca_2d <- as.data.frame(pca$x[, 1:2])
+pca_2d$group <- c(rep("points_01", nrow(points_01)), rep("points_02", nrow(points_02)))
+
+# compute CH for each group
+pca_points_01 <- pca_2d[pca_2d$group == "points_01", ]
+pca_points_02 <- pca_2d[pca_2d$group == "points_02", ]
+
+
+ch_points_01 <- pca_points_01[chull(pca_points_01[,1:2]),]
+ch_points_02 <- pca_points_02[chull(pca_points_02[,1:2]),]
+
+# Plot the PCA in 2D
+
+p <- ggplot() +
+  geom_point(data = pca_points_01, aes(x = PC1, y = PC2), color = "green") +
+  geom_point(data = pca_points_02, aes(x = PC1, y = PC2), color = "red") +
+  geom_polygon(data = ch_points_01, aes(x =PC1, y = PC2), fill = "green", alpha = 0.1) +
+  geom_polygon(data = ch_points_02, aes(x = PC1, y = PC2), fill = "red", alpha = 0.1) +
+  labs(x = "PC1", y = "PC2", color = "Group")
+    
+
+ggsave(paste0("figures/", example, "_pca.png"), p, width = 10, height = 4)
+```
+
 
 ```{r}
 
@@ -130,6 +172,10 @@ knitr::kable(tibble(
     volume_alpha = volume_alpha_null,
     volume_convex = volume_convex,
     density_convex = volume_density_auto / volume_convex,
-  ), format = "latex")
+  ))
 
-``` 
+
+```
+
+
+

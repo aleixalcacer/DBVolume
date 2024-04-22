@@ -1,0 +1,266 @@
+---
+title: "Density Based Volume Estimation"
+output: 
+  html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+
+# Example 01
+
+```{r}
+# Load points 01
+
+# Load csv file from desktop in Windows
+# data <- read_csv2("C:/Users/aalcacer/Desktop/TCSArcalis.csv")
+# data <- read_csv2("C:/Users/aalcacer/Desktop/TCSTlepidus_m.csv")
+#data <- read_csv2("C:/Users/aalcacer/Desktop/TCSPionicus.csv")
+
+# Remove the first column
+# points_01 <- data[, -1]
+
+n <- 50
+points_01_1 <- matrix(
+  c(
+    runif(n, min = 0, max = 1),
+    runif(n, min = 0, max = 1),
+    runif(n, min = 0, max = 1)
+  ),
+  ncol = 3
+)
+
+# Add extremes of the cube
+points_01_1 <- rbind(points_01_1, matrix(c(0, 0, 0), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(0, 0, 1), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(0, 1, 0), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(0, 1, 1), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(1, 0, 0), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(1, 0, 1), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(1, 1, 0), ncol = 3))
+points_01_1 <- rbind(points_01_1, matrix(c(1, 1, 1), ncol = 3))
+
+
+points_01_2 <- matrix(
+  c(
+    runif(n, min = 2, max = 3),
+    runif(n, min = 0, max = 1),
+    runif(n, min = 0, max = 1)
+  ),
+  ncol = 3
+)
+
+# # Add extremes of the cube
+points_01_2 <- rbind(points_01_2, matrix(c(2, 0, 0), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(2, 0, 1), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(2, 1, 0), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(2, 1, 1), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(3, 0, 0), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(3, 0, 1), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(3, 1, 0), ncol = 3))
+points_01_2 <- rbind(points_01_2, matrix(c(3, 1, 1), ncol = 3))
+
+# Add points in the Intersection
+
+points_01_int <- matrix(
+  c(
+    runif(n, min = 1.2, max = 1.8),
+    runif(n, min = 0.2, max = 0.8),
+    runif(n, min = 0.2, max = 0.8)
+  ),
+  ncol = 3
+)
+
+
+
+points_01_dup <- rbind(points_01_1, points_01_2, points_01_int, points_01_int + 0.01)
+points_01 <- rbind(points_01_1, points_01_2, points_01_int)
+
+colnames(points_01_dup) <- c("x", "y", "z")
+colnames(points_01) <- c("x", "y", "z")
+
+```
+
+```{r}
+# Load points 02
+
+# Load file from desktop in Windows
+# data <- read_csv2("C:/Users/aalcacer/Desktop/TCSOlot.csv")
+# data <- read_csv2("C:/Users/aalcacer/Desktop/TCSTlepidus_f.csv")
+# data <- read_csv2("C:/Users/aalcacer/Desktop/TCSTPpeloponnesiacus.csv")
+
+# Remove the first column
+# points_02 <- data[, -1]
+
+# n <- 10
+# n2 <- 1000
+
+points_02_1 <- matrix(
+  c(
+    runif(n, min = 1, max = 2),
+    runif(n, min = -1, max = 0),
+    runif(n, min = 0, max = 1)
+  ),
+  ncol = 3
+)
+
+# Add extremes of the cube
+points_02_1 <- rbind(points_02_1, matrix(c(1, -1, 0), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(1, -1, 1), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(1, 0, 0), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(1, 0, 1), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(2, -1, 0), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(2, -1, 1), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(2, 0, 0), ncol = 3))
+points_02_1 <- rbind(points_02_1, matrix(c(2, 0, 1), ncol = 3))
+
+points_02_2 <- matrix(
+  c(
+    runif(n, min = 1, max = 2),
+    runif(n, min = 1, max = 2),
+    runif(n, min = 0, max = 1)
+  ),
+  ncol = 3
+)
+
+# Add extremes of the cube
+points_02_2 <- rbind(points_02_2, matrix(c(1, 1, 0), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(1, 1, 1), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(1, 2, 0), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(1, 2, 1), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(2, 1, 0), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(2, 1, 1), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(2, 2, 0), ncol = 3))
+points_02_2 <- rbind(points_02_2, matrix(c(2, 2, 1), ncol = 3))
+
+
+points_02_dup <- rbind(points_02_1, points_02_2)
+points_02 <- rbind(points_02_1, points_02_2)
+
+colnames(points_02_dup) <- c("x", "y", "z")
+colnames(points_02) <- c("x", "y", "z")
+```
+
+```{r}
+# Apply PCA to the points
+
+points_u = rbind(points_01_dup, points_02_dup)
+
+# Compute the PCA
+
+pca <- prcomp(points_u)
+
+# Plot the PCA in 2D
+
+pca_2d <- as.data.frame(pca$x[, 1:2])
+pca_2d$group <- c(rep("points_01", nrow(points_01_dup)), rep("points_02", nrow(points_02_dup)))
+
+# compute CH for each group
+pca_points_01 <- pca_2d[pca_2d$group == "points_01", ]
+pca_points_02 <- pca_2d[pca_2d$group == "points_02", ]
+
+
+ch_points_01 <- pca_points_01[chull(pca_points_01[,1:2]),]
+ch_points_02 <- pca_points_02[chull(pca_points_02[,1:2]),]
+
+# Plot the PCA in 2D
+
+p <- ggplot() +
+  geom_point(data = pca_points_01, aes(x = PC1, y = PC2), color = "blue") +
+  geom_point(data = pca_points_02, aes(x = PC1, y = PC2), color = "red") +
+  geom_polygon(data = ch_points_01, aes(x =PC1, y = PC2), fill = "blue", alpha = 0.1) +
+  geom_polygon(data = ch_points_02, aes(x = PC1, y = PC2), fill = "red", alpha = 0.1) +
+  labs(x = "PC1", y = "PC2", color = "Group")
+    
+
+p
+```
+
+
+```{r}
+source("R/voloverlap.R")
+source("R/utils.R")
+```
+
+
+```{r}
+# Compute de Volume
+
+# Compute the volume for different values of sigma
+# and store it in a Data Frame with columns (method, sigma, volume)
+volumes <- NULL
+params <- c(1e-2, 1e-1, 1, 1e1)
+```
+
+```{r}
+volume_density_null <- volume_overlap(points_01, points_02, sigma = NULL)$vboth
+
+for (param in params) {
+  volume_density <- volume_overlap(points_01, points_02, sigma = param)$vboth
+  volume_density_dup <- volume_overlap(points_01_dup, points_02_dup, sigma = param)$vboth
+
+  volume_i <- tibble(method = "volDENSITY", param = param, volume = volume_density, auto=FALSE)
+  volumes <- bind_rows(volumes, volume_i)
+  
+  volume_i <- tibble(method = "volDENSITY_DUP", param = param, volume = volume_density_dup, auto=FALSE)
+  volumes <- bind_rows(volumes, volume_i)
+
+  volume_i <- tibble(method = "volDENSITY_AUTO", param = param, volume = volume_density_null, auto=TRUE)
+  volumes <- bind_rows(volumes, volume_i)
+}
+```
+  
+```{r}
+
+for (param in params) {
+ volume_alpha_null <- pavo::voloverlap(points_01, points_02,
+                  type = "alpha", nsamp = 1e5, avalue = "auto")$pboth
+ 
+ volume_i <- tibble(method = "volALPHA_AUTO", param = param, volume = volume_alpha_null, auto=TRUE)
+ volumes <- bind_rows(volumes, volume_i)
+
+  volume_alpha <- pavo::voloverlap(points_01, points_02,
+                  type = "alpha", nsamp = 1e5, avalue = param)$pboth
+
+  volume_i <- tibble(method = "volALPHA", param = param, volume = volume_alpha, auto=FALSE)
+  volumes <- bind_rows(volumes, volume_i)
+  
+  volume_alpha_dup <- pavo::voloverlap(points_01_dup, points_02_dup,
+                  type = "alpha", nsamp = 1e5, avalue = param)$pboth
+  
+  volume_i <- tibble(method = "volALPHA_DUP", param = param, volume = volume_alpha_dup, auto=FALSE)
+  volumes <- bind_rows(volumes, volume_i)
+}
+
+```
+
+```{r}
+for (param in params) {
+  volume_convex <- pavo::voloverlap(points_01, points_02,
+                   type = "convex")$vboth
+  volume_i <- tibble(method = "volCONVEX", param = param, volume = volume_convex, auto=TRUE)
+  volumes <- bind_rows(volumes, volume_i)
+
+}
+```
+
+
+```{r}
+# Plot the results
+volumes_plot <- volumes
+p <- ggplot(volumes_plot, aes(x = param, y = volume, color = method)) +
+  geom_point(data=volumes_plot %>% filter(!auto)) +
+  geom_line() +
+  scale_x_log10() +
+  labs(x = "Sigma/Alpha", y = "Volume", color = "Method")
+
+p
+
+# ggsave("C:/Users/aalcacer/Desktop/volums_2.png", p, width = 10, height = 6)
+```
+
+```{r}
+
+```

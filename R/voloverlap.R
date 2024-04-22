@@ -42,6 +42,11 @@ volume_overlap <- function(points_a, points_b, sigma = NULL, n_sigma = 5) {
         vboth_i <- v_i_i / v_u_i
         # vsmallest_i <- v_i_i / min(v_a_i, v_b_i)
 
+        # cat("v_i_i: ", v_i_i, "\n")
+        # cat("v_a_i: ", v_a_i, "\n")
+        # cat("v_b_i: ", v_b_i, "\n")
+
+
         vboth <- c(vboth, vboth_i)
     }
 
