@@ -35,7 +35,11 @@ volume_overlap <- function(points_a, points_b, sigma = NULL, n_sigma = 5) {
 
     vboth <- c()
     for (sigma in sigmas) {
-        v_i_i <- sum(volume_square(ch_i, points_u, sigma = sigma))
+        if (ch_i$vol == 0) {
+            v_i_i <- 0
+        } else {
+            v_i_i <- sum(volume_square(ch_i, points_u, sigma = sigma))
+        }
         v_a_i <- sum(volume_square(ch_a, points_u, sigma = sigma))
         v_b_i <- sum(volume_square(ch_b, points_u, sigma = sigma))
         v_u_i <- v_a_i + v_b_i - v_i_i

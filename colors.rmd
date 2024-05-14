@@ -1,0 +1,183 @@
+
+```{r}
+# Set working directory
+setwd("C:/Users/aalcacer/Projects/DBVolume")
+```
+
+
+```{r}
+# Load points 01
+
+# Load csv file from Downloads in macOS
+library(tidyverse)
+root <- "data/"
+
+# example = "overlap"
+example = "no-overlap"
+```
+
+```{r}
+if (example == "overlap") {
+  data <- read_csv2(paste0(root, "TCStaronja.csv"))
+} else if (example == "no-overlap") {
+  data <- read_csv2(paste0(root, "TCStaronja.csv"))
+} else {
+    error("Data not found")
+}
+
+points_01 <- data %>% select(x, y, z)
+
+colnames(points_01) <- c("x", "y", "z")
+```
+
+```{r}
+# Load points 02
+
+if (example == "overlap") {
+  data <- read_csv2(paste0(root, "TCSgrocs.csv"))
+} else if (example == "no-overlap") {
+  data <- read_csv2(paste0(root, "TCSOVS.csv"))
+} else {
+    error("Data not found")
+}
+
+
+points_02 <- data %>% select(x, y, z)
+  
+colnames(points_02) <- c("x", "y", "z")
+```
+
+
+```{r}
+source("R/voloverlap.R")
+source("R/utils.R")
+```
+
+```{r}
+# Compute de Volume
+
+# Compute the volume for different values of sigma
+# and store it in a Data Frame with columns (method, sigma, volume)
+volume_density <- volume_overlap(points_01, points_02, n_sigma = 10, sigma = NULL)
+
+params <- volume_density$sigma
+```
+  
+```{r}
+
+volumes <- NULL
+volume_alpha_null <- pavo::voloverlap(points_01, points_02,
+                  type = "alpha", nsamp = 1e5, avalue = "auto")$pboth
+
+for (i in seq_len(length(params))) {
+
+  volume_i <- tibble(method = "density", param = params[i], volume = volume_density$vboth_extended[i])
+  volumes <- bind_rows(volumes, volume_i)
+
+  volume_i <- tibble(method = "density auto", param = params[i], volume = volume_density$vboth)
+  volumes <- bind_rows(volumes, volume_i)
+
+  volume_i <- tibble(method = "alpha-shape auto", param = params[i], volume = volume_alpha_null)
+  volumes <- bind_rows(volumes, volume_i)
+}
+```
+  
+```{r}
+
+for (param in params) {
+
+  volume_i <- tibble(method = "alpha-shape auto", param = param, volume = volume_alpha_null)
+  volumes <- bind_rows(volumes, volume_i)
+
+  volume_alpha <- pavo::voloverlap(points_01, points_02,
+                  type = "alpha", nsamp = 1e5, avalue = param)$pboth
+
+  volume_i <- tibble(method = "alpha-shape", param = param, volume = volume_alpha)
+  volumes <- bind_rows(volumes, volume_i)
+}
+```
+
+```{r}
+for (param in params) {
+  volume_convex <- pavo::voloverlap(points_01, points_02,
+                   type = "convex")$vboth
+  volume_i <- tibble(method = "convex-hull", param = param, volume = volume_convex)
+  volumes <- bind_rows(volumes, volume_i)
+}
+```
+
+```{r}
+# Plot the results
+volumes_plot <- volumes
+p <- ggplot(volumes_plot, aes(x = param, y = volume, color = method)) +
+  geom_point() +
+  geom_line() +
+  scale_x_log10() +
+  labs(x = "Sigma/Alpha", y = "Volume", color = "Method")
+
+
+ggsave(paste0("figures/", example, "_volume.png"), p, width = 10, height = 4)
+```
+
+```{r}
+```
+
+```{r}
+# Apply PCA to the points
+
+points_u = rbind(points_01, points_02)
+
+# Compute the PCA
+
+pca <- prcomp(points_u)
+
+# Plot the PCA in 2D
+
+pca_2d <- as.data.frame(pca$x[, 1:2])
+pca_2d$group <- c(rep("points_01", nrow(points_01)), rep("points_02", nrow(points_02)))
+
+# compute CH for each group
+pca_points_01 <- pca_2d[pca_2d$group == "points_01", ]
+pca_points_02 <- pca_2d[pca_2d$group == "points_02", ]
+
+
+ch_points_01 <- pca_points_01[chull(pca_points_01[,1:2]),]
+ch_points_02 <- pca_points_02[chull(pca_points_02[,1:2]),]
+
+# Plot the PCA in 2D
+
+p <- ggplot() +
+  geom_point(data = pca_points_01, aes(x = PC1, y = PC2), color = "green") +
+  geom_point(data = pca_points_02, aes(x = PC1, y = PC2), color = "red") +
+  geom_polygon(data = ch_points_01, aes(x =PC1, y = PC2), fill = "green", alpha = 0.1) +
+  geom_polygon(data = ch_points_02, aes(x = PC1, y = PC2), fill = "red", alpha = 0.1) +
+  labs(x = "PC1", y = "PC2", color = "Group")
+    
+
+ggsave(paste0("figures/", example, "_pca.png"), p, width = 10, height = 4)
+```
+
+
+```{r}
+
+volume_density_auto <- volume_density$vboth
+volume_density_sd <- volume_density$vboth_sd
+volume_density_cv <- volume_density$vboth_cv
+
+knitr::kable(tibble(
+    volume_density = volume_density_auto,
+    sd_density =  volume_density_sd,
+    cv_density = volume_density_cv,
+    volume_alpha = volume_alpha_null,
+    volume_convex = volume_convex,
+    density_convex = volume_density_auto / volume_convex,
+  ))
+
+
+```
+
+```{r}
+
+```
+
+
